@@ -1,0 +1,47 @@
+name: SELinux for GitHub Actions
+on:
+  push:
+
+jobs:
+  selinux-demo:
+    name: SELinux Demo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Setup Lima
+        uses: lima-vm/lima-actions/setup@v1
+        id: lima-actions-setup
+
+      - name: Cache ~/.cache/lima
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/lima
+          key: lima-${{ steps.lima-actions-setup.outputs.version }}
+
+      - name: Start Fedora
+        run: limactl start --plain --name=default --cpus=1 --memory=4 --network=lima:user-v2 template://fedora
+
+      - name: Setup SSH
+        uses: lima-vm/lima-actions/ssh@v1
+
+      - name: Setup Rust
+        run: |
+          lima sudo dnf install gcc g++ git rustup -y
+          lima rustup-init -y
+
+      - name: Demo selinux
+        run: |
+          lima getenforce
+          lima ls -laZ /etc/selinux
+
+      - name: Clone the coreutils repo
+        run: |
+          lima git clone https://github.com/uutils/coreutils /tmp/coreutils
+
+      - name: Run coreutils tests
+        env:
+          LIMA_WORKDIR: /tmp/coreutils
+        run: |
+          lima cargo test --features "chmod mv tail" --no-default-features
